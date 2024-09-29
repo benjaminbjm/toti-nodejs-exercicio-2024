@@ -1,47 +1,106 @@
-const express = require('express')
-const { Sequelize, DataTypes } = require('sequelize')
-const Task = require('./models/task')
+const express = require('express');
+const { Sequelize, DataTypes } = require('sequelize');
 
-const app = express()
-const sequelize = new Sequelize({ dialect: 'sqlite', storage: './task-list.db' })
-const tasks = Task(sequelize, DataTypes)
+// Inicializa o Sequelize com o SQLite
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: './task-list.db'
+});
 
-// We need to parse JSON coming from requests
-app.use(express.json())
+// Define o modelo da Tarefa
+const Task = sequelize.define('Task', {
+  title: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  completed: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  }
+});
 
-// List tasks
-app.get('/tasks', (req, res) => {
-  res.json({ action: 'Listing tasks' })
-})
+// Sincroniza o modelo com o banco de dados
+sequelize.sync();
 
-// Create task
-app.post('/tasks', (req, res) => {
-  const body = req.body
+const app = express();
 
-  res.json(body)
-})
+// Permite que o express parseie o JSON
+app.use(express.json());
 
-// Show task
-app.get('/tasks/:id', (req, res) => {
-  const taskId = req.params.id
+// Rota para listar todas as tarefas
+app.get('/tasks', async (req, res) => {
+  try {
+    const tasks = await Task.findAll();
+    res.json(tasks);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao listar tarefas' });
+  }
+});
 
-  res.send({ action: 'Showing task', taskId: taskId })
-})
+// Rota para criar uma nova tarefa
+app.post('/tasks', async (req, res) => {
+  try {
+    const { title, description, completed } = req.body;
+    const task = await Task.create({ title, description, completed });
+    res.status(201).json(task);
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao criar a tarefa' });
+  }
+});
 
-// Update task
-app.put('/tasks/:id', (req, res) => {
-  const taskId = req.params.id
+// Rota para exibir uma tarefa específica pelo ID
+app.get('/tasks/:id', async (req, res) => {
+  try {
+    const task = await Task.findByPk(req.params.id);
+    if (task) {
+      res.json(task);
+    } else {
+      res.status(404).json({ error: 'Tarefa não encontrada' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao exibir a tarefa' });
+  }
+});
 
-  res.send({ action: 'Updating task', taskId: taskId })
-})
+// Rota para atualizar uma tarefa específica pelo ID
+app.put('/tasks/:id', async (req, res) => {
+  try {
+    const { title, description, completed } = req.body;
+    const task = await Task.findByPk(req.params.id);
+    if (task) {
+      task.title = title;
+      task.description = description;
+      task.completed = completed;
+      await task.save();
+      res.json(task);
+    } else {
+      res.status(404).json({ error: 'Tarefa não encontrada' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao atualizar a tarefa' });
+  }
+});
 
-// Delete task
-app.delete('/tasks/:id', (req, res) => {
-  const taskId = req.params.id
+// Rota para deletar uma tarefa específica pelo ID
+app.delete('/tasks/:id', async (req, res) => {
+  try {
+    const task = await Task.findByPk(req.params.id);
+    if (task) {
+      await task.destroy();
+      res.json({ message: 'Tarefa deletada com sucesso' });
+    } else {
+      res.status(404).json({ error: 'Tarefa não encontrada' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao deletar a tarefa' });
+  }
+});
 
-  res.send({ action: 'Deleting task', taskId: taskId })
-})
-
+// Inicia o servidor na porta 3000
 app.listen(3000, () => {
-  console.log('Iniciando o ExpressJS na porta 3000')
-})
+  console.log('Servidor ExpressJS rodando na porta 3000');
+});
